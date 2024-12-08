@@ -6,6 +6,9 @@
         "ioctl.h": "c",
         "sfs.h": "c",
         "ddriver.h": "c",
-        "errno.h": "c"
-    }
+        "errno.h": "c",
+        "type_traits": "cpp",
+        "cmath": "cpp"
+    },
+    "cmake.sourceDirectory": "/home/students/220110430/user-land-filesystem/fs/newfs"
 }

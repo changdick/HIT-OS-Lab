@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${default}",
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compileCommands": "${workspaceFolder}/fs/newfs/build/compile_commands.json"
+        }
+    ],
+    "version": 4
+}

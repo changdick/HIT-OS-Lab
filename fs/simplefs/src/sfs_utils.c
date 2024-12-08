@@ -353,9 +353,9 @@ int sfs_drop_inode(struct sfs_inode * inode) {
  * @return struct sfs_inode* 
  */
 struct sfs_inode* sfs_read_inode(struct sfs_dentry * dentry, int ino) {
-    struct sfs_inode* inode = (struct sfs_inode*)malloc(sizeof(struct sfs_inode));
+    struct sfs_inode* inode = (struct sfs_inode*)malloc(sizeof(struct sfs_inode)); // 先申请内存inode空间
     struct sfs_inode_d inode_d;
-    struct sfs_dentry* sub_dentry;
+    struct sfs_dentry* sub_dentry; 
     struct sfs_dentry_d dentry_d;
     int    dir_cnt = 0, i;
     /* 从磁盘读索引结点 */
@@ -363,12 +363,12 @@ struct sfs_inode* sfs_read_inode(struct sfs_dentry * dentry, int ino) {
                         sizeof(struct sfs_inode_d)) != SFS_ERROR_NONE) {
         SFS_DBG("[%s] io error\n", __func__);
         return NULL;                    
-    }
+    }                       //从磁盘读索引节点
     inode->dir_cnt = 0;
     inode->ino = inode_d.ino;
     inode->size = inode_d.size;
     memcpy(inode->target_path, inode_d.target_path, SFS_MAX_FILE_NAME);
-    inode->dentry = dentry;
+    inode->dentry = dentry;       // 将磁盘索引节点的信息赋值给内存inode
     inode->dentrys = NULL;
     /* 内存中的inode的数据或子目录项部分也需要读出 */
     if (SFS_IS_DIR(inode)) {
