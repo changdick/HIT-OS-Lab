@@ -64,6 +64,6 @@ int newfs_calc_lvl(const char * path);
 struct newfs_inode* newfs_alloc_inode(struct newfs_dentry * dentry);
 int newfs_alloc_dentry(struct newfs_inode* inode, struct newfs_dentry* dentry);
 struct newfs_dentry* new_dentry(const char* name, FILE_TYPE type);
-
-
+int wztfs_drop_dentry(struct newfs_inode * inode , struct newfs_dentry* dentry);
+int wztfs_drop_inode(struct newfs_inode * inode);
 #endif  /* _newfs_H_ */

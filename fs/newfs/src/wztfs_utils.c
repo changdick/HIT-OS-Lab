@@ -128,6 +128,13 @@ int newfs_driver_write(int offset, uint8_t *in_content, int size) {
  * @return int 
  */
 int newfs_alloc_dentry(struct newfs_inode* inode, struct newfs_dentry* dentry) {
+    
+    // 此函数，在内存中管理inode和dentry的。inode是一个父目录的inode，dentry是子目录。
+    // 在内存中，inode使用链表管理其下拥有的dentrys。和sfs是一样的原理。
+    // sfs的构造不管数据块，但是我们要求按需分配数据块。所以要考虑inode的数据块按需分配
+    
+
+
     if (inode->dentrys == NULL) {
         inode->dentrys = dentry;
     }
@@ -135,6 +142,9 @@ int newfs_alloc_dentry(struct newfs_inode* inode, struct newfs_dentry* dentry) {
         dentry->brother = inode->dentrys;
         inode->dentrys = dentry;
     }
+
+
+
     inode->dir_cnt++;
     inode->size += sizeof(struct newfs_dentry);
 	int MAX_DENTRY_PER_BLOCK = DENTRY_PER_BLK();   // 先声明，后面用宏定义补
@@ -220,6 +230,12 @@ int wztfs_alloc_data() {
  * @return nfs_inode
  */
 struct newfs_inode* newfs_alloc_inode(struct newfs_dentry * dentry) {
+
+    // 为一个dentry分配对应的inode。创建文件的时候，先创建dentry，再用该函数分配inode。
+    // 要根据位图，查找可用的inode块来使用。
+
+    // 因为创建的文件都是空文件，创建的目录也暂时无需分配数据块， 不管数据块的问题。
+
     struct newfs_inode* inode;
     int byte_cursor = 0; 
     int bit_cursor  = 0; 
@@ -265,10 +281,16 @@ struct newfs_inode* newfs_alloc_inode(struct newfs_dentry * dentry) {
 
     /* 如果inode指向文件类型，则需要分配数据指针。如果是目录则不需要，目录项已存在dentrys中*/
     // inode是内存里面的索引节点，分配指向内存中数据块的指针
+
+    // 应该改一下，改成直接分配一个大的连续数据块，使得数据块是连续的。
     if (INODE_IS_REG(inode)) {
+        uint8_t *large_block = (uint8_t *)malloc(DATA_PER_FILE * LOGIC_BLOCK_SIZE);
+
         for(int i = 0; i < DATA_PER_FILE; i++){
-            inode->data_ptr[i] = (uint8_t *)malloc(LOGIC_BLOCK_SIZE);
+            // inode->data_ptr[i] = (uint8_t *)malloc(LOGIC_BLOCK_SIZE);
+            inode->data_ptr[i] = large_block + i * LOGIC_BLOCK_SIZE;
         }
+
     }
 
     return inode;
@@ -310,7 +332,7 @@ int newfs_sync_inode(struct newfs_inode * inode) {
         printf("%s 被写回磁盘",inode->dentry->name); //妈的，根本看不到输出
         blk_cnt = 0;                    
         dentry_cursor = inode->dentrys;   // 理解一下dentrys它是内存里面连续存储的目录项，dentry_cursor是用来遍历这些目录项的指针
-        /* dentry 要存满 4 个不连续的 blk 块 */
+        
 
         //条件有没有问题？
         while(dentry_cursor != NULL && blk_cnt < inode->block_used) {
@@ -369,6 +391,11 @@ int newfs_sync_inode(struct newfs_inode * inode) {
  * @return struct newfs_inode* 
  */
 struct newfs_inode* newfs_read_inode(struct newfs_dentry * dentry, int ino) {
+
+    // 传入的是内存中的dentry结构， 传入的ino是磁盘上的inode编号。
+    
+
+    
     struct newfs_inode* inode = (struct newfs_inode*)malloc(sizeof(struct newfs_inode));
     struct newfs_inode_d inode_d;
     struct newfs_dentry* sub_dentry; /* 指向 子dentry 数组 */
@@ -425,9 +452,21 @@ struct newfs_inode* newfs_read_inode(struct newfs_dentry * dentry, int ino) {
             blk_cnt++; /* 访问下一个指向的数据块 */
         }
     } else if (INODE_IS_REG(inode)) {  /* 如果是文件 */
-        for (int i = 0; i < DATA_PER_FILE; i++){
-            inode->data_ptr[i] = (uint8_t *)malloc(LOGIC_BLOCK_SIZE);
-            if (newfs_driver_read(DATA_OFFSET(inode->data_block[i]), (uint8_t *)inode->data_ptr[i], 
+        // for (int i = 0; i < DATA_PER_FILE; i++){
+        //     inode->data_ptr[i] = (uint8_t *)malloc(LOGIC_BLOCK_SIZE);
+        //     if (newfs_driver_read(DATA_OFFSET(inode->data_block[i]), (uint8_t *)inode->data_ptr[i], 
+        //                         LOGIC_BLOCK_SIZE) != ERROR_NONE) {
+        //         NFS_DBG("[%s] io error\n", __func__);
+        //         return NULL;                    
+        //     }
+        // }
+        
+        // 改个方法，不是每个数据块分别申请内存空间，而是一次性给所有数据块申请内存空间，然后分别用指针去指。
+        // 这样使得一个文件的数据在内存中连续。 外层读取就方便一点。
+        uint8_t *large_block = (uint8_t *)malloc(DATA_PER_FILE * LOGIC_BLOCK_SIZE);
+        for (int i = 0; i < DATA_PER_FILE; i++) {
+            inode->data_ptr[i] = large_block + i * LOGIC_BLOCK_SIZE;
+            if (newfs_driver_read(DATA_OFFSET(inode->data_block[i]), inode->data_ptr[i], 
                                 LOGIC_BLOCK_SIZE) != ERROR_NONE) {
                 NFS_DBG("[%s] io error\n", __func__);
                 return NULL;                    
@@ -436,6 +475,117 @@ struct newfs_inode* newfs_read_inode(struct newfs_dentry * dentry, int ino) {
     }
     return inode;
 }
+
+/**
+ * @brief 将dentry从inode的dentrys中取出.inode是父的节点，传入的dentry是inode下属的目录项
+ * 
+ * 
+ * 
+ */
+int wztfs_drop_dentry(struct newfs_inode * inode , struct newfs_dentry * dentry){
+    boolean is_find = FALSE;
+    struct newfs_dentry* dentry_cursor = inode->dentrys;
+
+    if (dentry_cursor == dentry) {
+        inode->dentrys = dentry->brother;  // 如果上来第一个就是，直接可以删除掉
+        is_find = TRUE;
+    } else {
+        while (dentry_cursor) {
+            if (dentry_cursor->brother == dentry) {
+                dentry_cursor->brother = dentry->brother;
+                is_find = TRUE;
+                break;
+            }
+            dentry_cursor = dentry_cursor->brother;
+        }
+    }
+    if (!is_find) {
+        return ERROR_NOTFOUND;
+    }
+    inode->dir_cnt--;
+    return inode->dir_cnt;
+}
+
+/**
+ * @brief 删除内存中的一个inode。对于目录需要递归删除其下的所有子目录项以及对应inode。
+ * 需要管理inode位图。对于文件，还需要管理数据块位图。
+ * 
+ * inode和dentry的顺序是，先删除inode，外层负责删除对应的dentry，通过drop_dentry函数
+ * 
+ * @param inode 要删除的inode
+ */
+int wztfs_drop_inode(struct newfs_inode * inode) {
+    struct newfs_dentry* dentry_cursor;
+    struct newfs_dentry* dentry_to_free;
+    struct newfs_inode* inode_cursor;
+
+    int byte_cursor = 0; 
+    int bit_cursor  = 0; 
+    int ino_cursor  = 0;
+    boolean is_find = FALSE;
+
+    // inode不能是根节点，先进行检查
+    if (inode == super.root_dentry->inode) {
+        return ERROR_INVAL;
+    }
+
+    // 如果是目录，需要递归删除其下的所有子目录项
+    if(INODE_IS_DIR(inode)) {
+        dentry_cursor = inode->dentrys;
+        while (dentry_cursor) {
+            inode_cursor = dentry_cursor->inode;
+            wztfs_drop_inode(inode_cursor);
+            wztfs_drop_dentry(inode, dentry_cursor);
+            dentry_to_free = dentry_cursor;
+            dentry_cursor = dentry_cursor->brother;
+            free(dentry_to_free);
+        
+        }
+        // 管理inode位图。把inode对应的位图位置0
+        for(byte_cursor = 0; byte_cursor < BLOCKS_SIZE(1); byte_cursor++) {
+            for(bit_cursor = 0; bit_cursor < UINT8_BITS; bit_cursor++) {
+                if (ino_cursor == inode->ino) {
+                    super.map_inode[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
+                    is_find = TRUE;
+                    break;
+                }
+                ino_cursor++;
+            }
+            if(is_find) {
+                break;
+            }
+        }
+
+    } else if (INODE_IS_REG(inode)) {
+        // 如果是文件，需要管理inode下面的数据块的数据块位图全部删一遍
+        // 通过inode->block_used来判断有多少个数据块，对于inode->data_block[0]到inode->data_block[block_used-1]的数据块,数据块位图置0
+        for (int i = 0; i < inode->block_used; i++) {
+            byte_cursor = inode->data_block[i] / UINT8_BITS;
+            bit_cursor  = inode->data_block[i] % UINT8_BITS;
+            super.map_data[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
+        }
+        // 管理inode位图。把inode对应的位图位置0
+        for(byte_cursor = 0; byte_cursor < BLOCKS_SIZE(1); byte_cursor++) {
+            for(bit_cursor = 0; bit_cursor < UINT8_BITS; bit_cursor++) {
+                if (ino_cursor == inode->ino) {
+                    super.map_inode[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
+                    is_find = TRUE;
+                    break;
+                }
+                ino_cursor++;
+            }
+            if(is_find) {
+                break;
+            }
+        }
+        // 释放内存中数据块
+        if (inode->data_ptr[0])
+            free (inode->data_ptr[0]);
+        free(inode);
+    }
+    return ERROR_NONE;
+}
+
 
 /**
  * @brief 指定inode，获取dentrys中的第dir个dentry

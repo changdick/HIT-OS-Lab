@@ -145,6 +145,7 @@ struct newfs_inode {
     int block_used;
 };
 
+// inode的大小是128B，所以一个块可以放8个inode
 struct newfs_inode_d {
     uint32_t           ino;                             // 索引编号
     uint32_t           size;                            // 文件已占用空间
@@ -154,6 +155,10 @@ struct newfs_inode_d {
     int                dir_cnt;                         // 如果是目录类型文件，下面有几个目录项
     int                block_used;                      // 已经使用的块数
 
+
+    // 前面18个int， 72字节
+    // 凑成可以让1024整除的字节数，凑到128B，所以还差56字节
+    char               padding[56];                // 填充字节                           
 };
 
 struct newfs_dentry {
@@ -191,13 +196,15 @@ struct newfs_dentry_d {
 #define BLOCKS_SIZE(blks)               ((blks) * LOGIC_BLOCK_SIZE)
 
 // 计算偏移
-#define INODE_OFFSET(ino)                (super.inode_offset + BLOCKS_SIZE(ino)) // 这个能用是说一个索引就占一个块
+#define INODE_OFFSET(ino)                (super.inode_offset + (ino) * sizeof(struct newfs_inode_d)) // 这个能用是说一个索引就占一个块
 #define DATA_OFFSET(bno)               (super.data_offset + BLOCKS_SIZE(bno))
 // 判断inode类型
 #define INODE_IS_DIR(pinode)              (pinode->dentry->type == WZT_DIR)
 #define INODE_IS_REG(pinode)              (pinode->dentry->type == WZT_FILE)
 
 #define DENTRY_PER_BLK()            ((BLK_SZ()) / sizeof(struct newfs_dentry_d)) // 这边问题：要用dentry还是dentry_d?
+
+
 
 #define BLK_SZ()                    (super.block_size)  
 
