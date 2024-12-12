@@ -57,20 +57,13 @@ struct custom_options {
 struct newfs_super {
     uint32_t magic;
     int      fd;
-    /* TODO: Define yourself */
-    // 在这里自己定义至少五个部分的信息
-    
-    //io
     uint32_t sz_io;          // io大小
-
     // 逻辑块大小和块数
     uint32_t block_size;     // 块大小
     uint32_t block_nums;     // 块数
-
     // 磁盘大小
     uint32_t disk_size;
     int                 sz_usage;           /* ioctl 相关信息 */
-   
     // 索引节点位图起始块号
     uint32_t inode_bitmap_block;
     uint8_t*            map_inode;           // 指向 inode 位图的内存起点 
@@ -78,7 +71,6 @@ struct newfs_super {
     uint32_t map_inode_blks;
     // inode位图偏移
     uint32_t map_inode_offset;
-
     // 数据块位图起始块号
     uint32_t data_bitmap_block;
     uint8_t*            map_data;           // 指向 data 位图的内存起点 
@@ -86,27 +78,19 @@ struct newfs_super {
     uint32_t map_data_blks;
     // 数据块位图偏移
     uint32_t map_data_offset;
-
     // 索引节点起始offset
     uint32_t inode_offset;
     // inode信息
     uint32_t inode_size;     // inode大小
     uint32_t inode_nums;     // inode数(最大支持的inode数量)
-    
     // 数据块起始块号
     uint32_t data_offset;
     uint32_t data_block;
     //数据块最大数目
     uint32_t max_data;
-
-   
-
     // 根目录索引
     uint32_t root_inode;
-
     struct newfs_dentry* root_dentry;
-
-
     // 是否挂
     boolean is_mounted;
 };
@@ -155,7 +139,6 @@ struct newfs_inode_d {
     int                dir_cnt;                         // 如果是目录类型文件，下面有几个目录项
     int                block_used;                      // 已经使用的块数
 
-
     // 前面18个int， 72字节
     // 凑成可以让1024整除的字节数，凑到128B，所以还差56字节
     char               padding[56];                // 填充字节                           
@@ -174,6 +157,7 @@ struct newfs_dentry {
     // 文件类型
     FILE_TYPE type;
 };
+// size of dentry_d is 136
 struct newfs_dentry_d {
     char            name[MAX_NAME_LEN];                 // 文件名
     uint32_t        ino;                                // 指向的ino号
@@ -189,9 +173,9 @@ struct newfs_dentry_d {
     宏定义一些函数
 */
 // 求偏移量下界
-#define OFFSET_ROUND_DOWN(value, round)    ((value) % (round) == 0 ? (value) : ((value) / (round)) * (round))
+#define OFFSET_ROUND_DOWN(value, round)     ((value) % (round) == 0 ? (value) : ((value) / (round)) * (round))
 // 求偏移量上界
-#define OFFSET_ROUND_UP(value, round)      ((value) % (round) == 0 ? (value) : ((value) / (round) + 1) * (round))
+#define OFFSET_ROUND_UP(value, round)     ((value) % (round) == 0 ? (value) : ((value) / (round) + 1) * (round))
 // 块数求字节数
 #define BLOCKS_SIZE(blks)               ((blks) * LOGIC_BLOCK_SIZE)
 

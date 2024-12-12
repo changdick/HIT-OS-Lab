@@ -27,13 +27,13 @@ static struct fuse_operations operations = {
 	.getattr = newfs_getattr,				 /* 获取文件属性，类似stat，必须完成 */
 	.readdir = newfs_readdir,				 /* 填充dentrys */
 	.mknod = newfs_mknod,					 /* 创建文件，touch相关 */
-	.write = newfs_write,								  	 /* 写入文件 */
-	.read = newfs_read,								  	 /* 读文件 */
+	.write = newfs_write,					/* 写入文件 */
+	.read = newfs_read,						/* 读文件 */
 	.utimens = newfs_utimens,				 /* 修改时间，忽略，避免touch报错 */
-	.truncate = newfs_truncate,						  		 /* 改变文件大小 */
-	.unlink = newfs_unlink,							  		 /* 删除文件 */
-	.rmdir	= newfs_rmdir,							  		 /* 删除目录， rm -r */
-	.rename = newfs_rename,							  		 /* 重命名，mv */
+	.truncate = newfs_truncate,				/* 改变文件大小 */
+	.unlink = newfs_unlink,					/* 删除文件 */
+	.rmdir	= newfs_rmdir,				 /* 删除目录， rm -r */
+	.rename = newfs_rename,					/* 重命名，mv */
 
 	.open = newfs_open,							
 	.opendir = newfs_opendir,
@@ -151,7 +151,7 @@ int newfs_getattr(const char* path, struct stat * newfs_stat) {
 	if (is_root) {
 		newfs_stat->st_size	= super.sz_usage; 
 		newfs_stat->st_blocks = DISK_SIZE / LOGIC_BLOCK_SIZE;  // 磁盘块数/块大小 没有错
-		newfs_stat->st_nlink  = 2;		/* !特殊，根目录link数为2 */
+		newfs_stat->st_nlink  = 2;		/*根目录link数为2 */
 	}
 	return ERROR_NONE;
 
@@ -226,8 +226,6 @@ int newfs_mknod(const char* path, mode_t mode, dev_t dev) {
 	}
 	else if (S_ISDIR(mode)) {
 		dentry = new_dentry(fname, WZT_DIR);
-	} else {
-		dentry = new_dentry(fname, WZT_FILE);
 	}
 	dentry->parent = last_dentry;
 	inode = newfs_alloc_inode(dentry);
@@ -407,6 +405,7 @@ int newfs_rename(const char* from, const char* to) {
 	wztfs_drop_inode(to_dentry->inode);
 	to_dentry->ino = from_inode->ino;
 	to_dentry->inode = from_inode;
+	to_dentry->inode->dentry = to_dentry;
 
 
 	wztfs_drop_dentry(from_dentry->parent->inode, from_dentry);

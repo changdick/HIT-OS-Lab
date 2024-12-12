@@ -59,6 +59,7 @@ struct newfs_dentry* newfs_get_dentry(struct newfs_inode * inode, int dir);
 struct newfs_dentry* newfs_lookup(const char * path, boolean* is_find, boolean* is_root);
 int newfs_mount(struct custom_options options);
 int newfs_umount();
+int wztfs_alloc_data();
 char* newfs_get_fname(const char* path);
 int newfs_calc_lvl(const char * path);
 struct newfs_inode* newfs_alloc_inode(struct newfs_dentry * dentry);

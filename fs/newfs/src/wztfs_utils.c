@@ -146,7 +146,7 @@ int newfs_alloc_dentry(struct newfs_inode* inode, struct newfs_dentry* dentry) {
 
 
     inode->dir_cnt++;
-    inode->size += sizeof(struct newfs_dentry);
+    inode->size += sizeof(struct newfs_dentry_d);
 	int MAX_DENTRY_PER_BLOCK = DENTRY_PER_BLK();   // 先声明，后面用宏定义补
 	// 如果当前储存dentry的数据块已存满，则需要开辟新的数据块储存dentry
 	// 如何判断父目录数据块是否已满，用inode->dir_cnt，和已知每个数据块最多存储的dentry数量
@@ -316,9 +316,9 @@ int newfs_sync_inode(struct newfs_inode * inode) {
 
     int blk_cnt = 0;
     for(blk_cnt = 0; blk_cnt < DATA_PER_FILE; blk_cnt++) {
-        inode_d.data_block[blk_cnt] = inode->data_block[blk_cnt]; /* 数据块的块号也要赋值 */
+        inode_d.data_block[blk_cnt] = inode->data_block[blk_cnt]; // 赋值数据块索引
     }
-    int offset, offset_limit;  /* 用于密集写回 dentry */
+    int offset, offset_limit;  //写回 dentry 使用
     
     // inode_d 刷回磁盘
     if (newfs_driver_write(INODE_OFFSET(ino), (uint8_t *)&inode_d, 
@@ -542,18 +542,27 @@ int wztfs_drop_inode(struct newfs_inode * inode) {
         
         }
         // 管理inode位图。把inode对应的位图位置0
-        for(byte_cursor = 0; byte_cursor < BLOCKS_SIZE(1); byte_cursor++) {
-            for(bit_cursor = 0; bit_cursor < UINT8_BITS; bit_cursor++) {
-                if (ino_cursor == inode->ino) {
-                    super.map_inode[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
-                    is_find = TRUE;
-                    break;
-                }
-                ino_cursor++;
-            }
-            if(is_find) {
-                break;
-            }
+        // for(byte_cursor = 0; byte_cursor < BLOCKS_SIZE(1); byte_cursor++) {
+        //     for(bit_cursor = 0; bit_cursor < UINT8_BITS; bit_cursor++) {
+        //         if (ino_cursor == inode->ino) {
+        //             super.map_inode[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
+        //             is_find = TRUE;
+        //             break;
+        //         }
+        //         ino_cursor++;
+        //     }
+        //     if(is_find) {
+        //         break;
+        //     }
+        // } // 两层循环的逻辑，可以简化为下面的逻辑
+        byte_cursor = inode->ino / UINT8_BITS;
+        bit_cursor  = inode->ino % UINT8_BITS;
+        super.map_inode[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
+        // 通过inode->block_used来判断有多少个数据块，对于inode->data_block[0]到inode->data_block[block_used-1]的数据块,数据块位图置0
+        for (int i = 0; i < inode->block_used; i++) {
+            byte_cursor = inode->data_block[i] / UINT8_BITS;
+            bit_cursor  = inode->data_block[i] % UINT8_BITS;
+            super.map_data[byte_cursor] &= (uint8_t)(~(0x1 << bit_cursor));
         }
 
     } else if (INODE_IS_REG(inode)) {
